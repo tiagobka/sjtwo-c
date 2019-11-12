@@ -16,6 +16,7 @@ app_cli_status_e cli__crash_me(app_cli__argument_t argument, sl_string_t user_in
 #if (0 != configUSE_TRACE_FACILITY)
 app_cli_status_e cli__task_list(app_cli__argument_t argument, sl_string_t user_input_minus_command_name,
                                 app_cli__print_string_function cli_output) {
+
   const int sleep_time = sl_string__to_int(user_input_minus_command_name);
   if (sleep_time > 0) {
     vTaskResetRunTimeStats();
@@ -69,9 +70,55 @@ static void cli__task_list_print(sl_string_t output_string, app_cli__print_strin
   cli_output(unused_cli_param, output_string);
 }
 #else
+
 app_cli_status_e cli__task_list(app_cli__argument_t argument, sl_string_t user_input_minus_command_name,
                                 app_cli__print_string_function cli_output) {
   cli_output(argument, "ERROR: configUSE_TRACE_FACILITY needs to be enabled at FreeRTOSConfig.h\n");
   return APP_CLI_STATUS__SUCCESS;
 }
 #endif /* configUSE_TRACE_FACILITY */
+
+#if (0 != configUSE_TRACE_FACILITY)
+app_cli_status_e cli__your_handler(app_cli__argument_t argument, sl_string_t user_input_minus_command_name,
+                                   app_cli__print_string_function cli_output) {
+
+  sl_string_t s = user_input_minus_command_name;
+
+  if (sl_string__begins_with_ignore_case(s, "suspend")) {
+    // TODO: Use sl_string API to remove the first word, such that variable 's' will equal to 'led0'
+    sl_string__trim_start(s, "suspend ");
+    // TODO: Or you can do this: char name[16]; sl_string__scanf("%*s %16s", name);
+
+    // Now try to query the tasks with the name 'led0'
+    // sl_string__printf(s, "this is it\n");
+    TaskHandle_t task_handle = xTaskGetHandle(s);
+    if (NULL == task_handle) {
+      // note: we cannot use 'sl_string__printf("Failed to find %s", s);' because that would print existing string onto
+      // itself
+      sl_string__insert_at(s, 0, "Could not find a task with name:");
+      cli_output(NULL, s);
+    } else {
+      // TODO: Use vTaskSuspend()
+      sl_string__insert_at(s, 0, "Suspending task with name:");
+      vTaskSuspend(task_handle);
+    }
+  } else if (sl_string__begins_with_ignore_case(s, "resume")) {
+    // TODO
+    sl_string__trim_start(s, "resume ");
+    TaskHandle_t task_handle = xTaskGetHandle(s);
+    sl_string__insert_at(s, 0, "Resuming task with name:");
+    vTaskResume(task_handle);
+  } else {
+    cli_output(NULL, "Did you mean to say suspend or resume?\n");
+  }
+
+  // sl_string is a powerful string library, and you can utilize the sl_string.h API to parse parameters of a command
+
+  // Sample code to output data back to the CLI
+  // Re-use a string to save memory
+  // sl_string__printf(s, "Hello back to the CLI\n");
+  cli_output(NULL, s);
+
+  return APP_CLI_STATUS__SUCCESS;
+}
+#endif

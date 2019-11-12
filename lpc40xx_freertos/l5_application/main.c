@@ -1,76 +1,126 @@
-#include <stdio.h>
-
 #include "FreeRTOS.h"
 #include "task.h"
 
-#include "board_io.h"
-#include "common_macros.h"
+#include "clock.h"
+#include "delay.h"
 #include "gpio.h"
+#include "lpc40xx.h"
+#include "lpc_peripherals.h"
+#include "semphr.h"
 #include "sj2_cli.h"
+#include "sl_string.h"
+#include "uart_printf.h"
+#include <stdio.h>
+#include <stdlib.h>
 
-static void blink_task(void *params);
-static void uart_task(void *params);
+#include "cli_handlers.h"
+#include "ff.h"
+#include "globals.h"
+#include "queue.h"
+#include <string.h>
+void read_file_using_fatfs_pi(int value);
+// void write_file_using_fatfs_pi(acceleration__axis_data_s);
+sl_string_t fileName = "";
+// python nxp-programmer/flash.py --device COM1 -i _build_lpc40xx_freertos/lpc40xx_freertos.bin
+// static QueueHandle_t values_queue;
+// TaskHandle_t xHandlePlayer;
 
-static gpio_s led0, led1;
+//-------------------------------------------
+//---------------HANDLER-----------------------
+//-------------------------------------------
+app_cli_status_e cli__player_handler(app_cli__argument_t argument, sl_string_t user_input_minus_command_name,
+                                     app_cli__print_string_function cli_output) {
 
-int main(void) {
-  led0 = board_io__get_led0();
-  led1 = board_io__get_led1();
+  sl_string_t s = user_input_minus_command_name;
+  // uint16_t slenght = sl_string__get_length(s);
+  // for (int i = 0; i <= slenght; i++) {
+  char c = (char)s[0];
+  fileName = s;
 
-  xTaskCreate(blink_task, "led0", configMINIMAL_STACK_SIZE, (void *)&led0, PRIORITY_LOW, NULL);
-  xTaskCreate(blink_task, "led1", configMINIMAL_STACK_SIZE, (void *)&led1, PRIORITY_LOW, NULL);
+  xQueueSend(music_name, &c, 100);
+  //}
+  // char c = '\n';
+  // printf("%c", c);
+  // xQueueSend(music_name, &c, 100);
 
-  // It is advised to either run the uart_task, or the SJ2 command-line (CLI), but not both
-  // Change '#if 0' to '#if 1' and vice versa to try it out
-#if 0
-  // printf() takes more stack space, size this tasks' stack higher
-  xTaskCreate(uart_task, "uart", (512U * 8) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
-#else
-  sj2_cli__init();
-  UNUSED(uart_task); // uart_task is un-used in if we are doing cli init()
-#endif
+  return APP_CLI_STATUS__SUCCESS;
+}
+//-------------------------------------------
+//---------------HANDLER-----------------------
+//-------------------------------------------
 
-  puts("Starting RTOS");
-  vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
+void reader(void *p) {
+  char x;
+  while (1) {
+    xQueueReceive(music_name, &x, portMAX_DELAY);
+    char c = 'x';
+    xQueueSend(data_queue, &c, 100);
 
-  return 0;
+    // if (x != '\n')
+    // sl_string__append(fileName, x);
+  }
+
+  // printf("%c%c%c%c%c%c%c%c", x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]);
 }
 
-static void blink_task(void *params) {
-  const gpio_s led = *((gpio_s *)params);
-
-  // Warning: This task starts with very minimal stack, so do not use printf() API here to avoid stack overflow
-  while (true) {
-    gpio__toggle(led);
-    vTaskDelay(500);
+void player(void *p) {
+  char x;
+  while (1) {
+    xQueueReceive(data_queue, &x, portMAX_DELAY);
+    read_file_using_fatfs_pi(0);
   }
 }
 
-// This sends periodic messages over printf() which uses system_calls.c to send them to UART0
-static void uart_task(void *params) {
-  TickType_t previous_tick = 0;
-  TickType_t ticks = 0;
+int main(void) {
+  sj2_cli__init();
+  // if (!MN_initialized)
+  music_name = xQueueCreate(LEN_OF_QUEUE, sizeof(char));
+  data_queue = xQueueCreate(1, sizeof(char));
 
-  while (true) {
-    // This loop will repeat at precise task delay, even if the logic below takes variable amount of ticks
-    vTaskDelayUntil(&previous_tick, 2000);
+  xTaskCreate(reader, "reader", (512U * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(player, "player", (512U * 4) / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
+  // xTaskCreate(watchdog_task, "Watchdog", (512U * 4) / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
+  vTaskStartScheduler();
+}
 
-    /* Calls to fprintf(stderr, ...) uses polled UART driver, so this entire output will be fully
-     * sent out before this function returns. See system_calls.c for actual implementation.
-     *
-     * Use this style print for:
-     *  - Interrupts because you cannot use printf() inside an ISR
-     *  - During debugging in case system crashes before all output of printf() is sent
-     */
-    ticks = xTaskGetTickCount();
-    fprintf(stderr, "%u: This is a polled version of printf used for debugging ... finished in", (unsigned)ticks);
-    fprintf(stderr, " %lu ticks\n", (xTaskGetTickCount() - ticks));
+/*void write_file_using_fatfs_pi(int value) {
+  const char *filename = "tiagofile.txt";
+  FIL file; // File handle
+  UINT bytes_written = 0;
+  FRESULT result = f_open(&file, filename, (FA_WRITE | FA_OPEN_APPEND));
 
-    /* This deposits data to an outgoing queue and doesn't block the CPU
-     * Data will be sent later, but this function would return earlier
-     */
-    ticks = xTaskGetTickCount();
-    printf("This is a more efficient printf ... finished in");
-    printf(" %lu ticks\n\n", (xTaskGetTickCount() - ticks));
+  if (FR_OK == result) {
+    char string[64];
+    sprintf(string, "TS: %d, x:%i, y: %i, z: %i\n", xTaskGetTickCount(), value.x, value.y, value.z);
+    if (FR_OK == f_write(&file, string, strlen(string), &bytes_written)) {
+    } else {
+      //  printf("ERROR: Failed to write data to file\n");
+    }
+    f_close(&file);
+  } else {
+    // printf("ERROR: Failed to open: %s\n", filename);
+  }
+}*/
+
+void read_file_using_fatfs_pi(int value) {
+  // const char *filename = fileName; //todo NOT getting the filename
+  const char *filename = "hello.txt"; // had to hardcode it!
+  FIL file; // File handle
+  UINT bytes_read = 0;
+  FRESULT result = f_open(&file, filename, (FA_READ));
+
+  if (FR_OK == result) {
+    char string[512];
+    if (FR_OK == f_read(&file, string, strlen(string), &bytes_read)) {
+    } else {
+
+      printf("ERROR: Failed to read data from file\n");
+    }
+    for (int i = 0; i < 512; i++) {
+      printf("%c", string[i]);
+    }
+    f_close(&file);
+  } else {
+    printf("ERROR: Failed to open: %s\n", filename);
   }
 }
