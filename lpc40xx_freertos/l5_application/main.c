@@ -20,8 +20,8 @@
 #include <string.h>
 void read_file_using_fatfs_pi(int value);
 // void write_file_using_fatfs_pi(acceleration__axis_data_s);
-sl_string_t fileName = "";
-// python nxp-programmer/flash.py --device COM1 -i _build_lpc40xx_freertos/lpc40xx_freertos.bin
+char fileName[32];
+// python nxp-programmer/flash.py --device COM4 -i _build_lpc40xx_freertos/lpc40xx_freertos.bin
 // static QueueHandle_t values_queue;
 // TaskHandle_t xHandlePlayer;
 
@@ -32,10 +32,17 @@ app_cli_status_e cli__player_handler(app_cli__argument_t argument, sl_string_t u
                                      app_cli__print_string_function cli_output) {
 
   sl_string_t s = user_input_minus_command_name;
-  // uint16_t slenght = sl_string__get_length(s);
-  // for (int i = 0; i <= slenght; i++) {
+  uint16_t slenght = sl_string__get_length(s);
+  if (slenght > 32) {
+    printf("The file name is too big");
+    return APP_CLI_STATUS__SUCCESS;
+  }
+
   char c = (char)s[0];
-  fileName = s;
+  for (int i = 0; i < slenght; i++) {
+    fileName[i] = s[i];
+  }
+  // fileName = s;
 
   xQueueSend(music_name, &c, 100);
   //}
@@ -45,9 +52,9 @@ app_cli_status_e cli__player_handler(app_cli__argument_t argument, sl_string_t u
 
   return APP_CLI_STATUS__SUCCESS;
 }
-//-------------------------------------------
+//---------------------------------------------
 //---------------HANDLER-----------------------
-//-------------------------------------------
+//---------------------------------------------
 
 void reader(void *p) {
   char x;
@@ -73,13 +80,11 @@ void player(void *p) {
 
 int main(void) {
   sj2_cli__init();
-  // if (!MN_initialized)
   music_name = xQueueCreate(LEN_OF_QUEUE, sizeof(char));
   data_queue = xQueueCreate(1, sizeof(char));
 
   xTaskCreate(reader, "reader", (512U * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   xTaskCreate(player, "player", (512U * 4) / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
-  // xTaskCreate(watchdog_task, "Watchdog", (512U * 4) / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
   vTaskStartScheduler();
 }
 
@@ -103,12 +108,15 @@ int main(void) {
 }*/
 
 void read_file_using_fatfs_pi(int value) {
-  // const char *filename = fileName; //todo NOT getting the filename
-  const char *filename = "hello.txt"; // had to hardcode it!
+  printf("fileName is |%s| \n", fileName);
+  // const char *filename = fileName; // todo NOT getting the filename
+  // printf("filename is %s \n", filename);
+  // const char *filename = "hello.txt"; // had to Hardcode it!
   FIL file; // File handle
   UINT bytes_read = 0;
-  FRESULT result = f_open(&file, filename, (FA_READ));
-
+  printf("fileName2 is |%s| \n", fileName);
+  FRESULT result = f_open(&file, fileName, (FA_READ));
+  printf("fileName3 is |%s| \n", fileName);
   if (FR_OK == result) {
     char string[512];
     if (FR_OK == f_read(&file, string, strlen(string), &bytes_read)) {
@@ -121,6 +129,6 @@ void read_file_using_fatfs_pi(int value) {
     }
     f_close(&file);
   } else {
-    printf("ERROR: Failed to open: %s\n", filename);
+    printf("ERROR: Failed to open: %s\n", fileName);
   }
 }
