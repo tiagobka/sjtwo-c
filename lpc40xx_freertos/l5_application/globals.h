@@ -7,9 +7,9 @@
 #ifndef SJTWO_C_GLOBALS_H
 #define SJTWO_C_GLOBALS_H
 
-const int LEN_OF_QUEUE = 32;
-static QueueHandle_t music_name;
-bool MN_initialized = false;
-static QueueHandle_t data_queue;
-
+const int LEN_OF_NAME = 32;
+static QueueHandle_t MUSIC_NAME_QUEUE;
+const int LEN_OF_DATA = 512;
+static QueueHandle_t DATA_QUEUE;
+char TBFILENAME[32];
 #endif // SJTWO_C_GLOBALS_H
