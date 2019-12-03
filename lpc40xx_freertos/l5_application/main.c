@@ -1,7 +1,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-//#include "../l4_io/fatfs/ff13c/source/ff.h"
+#include "GrooveLCD.h"
 #include "cli_handlers.h"
 #include "clock.h"
 #include "delay.h"
@@ -18,12 +18,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-void read_file_using_fatfs_pi(int value);
-// void write_file_using_fatfs_pi(acceleration__axis_data_s);
+
 // python nxp-programmer/flash.py --device COM4 -i _build_lpc40xx_freertos/lpc40xx_freertos.bin
 // static QueueHandle_t values_queue;
 // TaskHandle_t xHandlePlayer;
+FRESULT scan_files(char *path);
+// char files[][];
+// char *files[100][32];
 
+sl_string_t files[100];
+
+uint8_t nFiles;
+
+gpio_s CS, SO, SCK, SI;
 //-------------------------------------------
 //---------------HANDLER-----------------------
 //-------------------------------------------
@@ -112,31 +119,94 @@ void player(void *p) {
 }
 
 int main(void) {
-  sj2_cli__init();
+  // sj2_cli__init();
+  rgb_lcd_begin(16, 2, 0);
+  nFiles = 0;
+  // char filename[32];
+
+  FATFS fs;
+  FRESULT res;
+  char buff[256];
+  for (;;) {
+    res = f_mount(&fs, "", 1);
+    if (res == FR_OK) {
+      strcpy(buff, "/");
+      res = scan_files(buff);
+    }
+  }
+
+  // for (int i = 0; i < nFiles; i++) {
+  // printf("FileName: %s\n", *files[i]);
+  //}
+
+  // FRESULT fr;  /* Return value */
+  // DIR dj;      /* Directory search object */
+  // FILINFO fno; /* File information */
+  // TCHAR pattern = "*.mp3";
+  /*
+    // f_findfirst(&dj, &fno, path, pattern);
+    fr = f_findfirst(&dj, &fno, "", pattern);
+    printf("%d\n", fr);
+    if (FR_OK == fr) {
+      printf("%s\n", fno.altname);
+    }*/
+
+  /*for (int i = 0; i < 4; i++) {
+    fr = f_findnext(&dj, &fno);
+    printf("return is %d", fr);
+    printf("%s- %d", fno.altname, fno.fsize);
+  }*/
+
   MUSIC_NAME_QUEUE = xQueueCreate(1, sizeof(TBFILENAME));
   DATA_QUEUE = xQueueCreate(1, LEN_OF_DATA);
 
-  xTaskCreate(reader, "reader", (512U * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
-  xTaskCreate(player, "player", (512U * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  // xTaskCreate(reader, "reader", (512U * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  // xTaskCreate(player, "player", (512U * 4) / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
   vTaskStartScheduler();
 }
 
-/*void read_file_using_fatfs_pi(int value) {
-  FIL file; // File handle
-  UINT bytes_read = 0;
-  FRESULT result = f_open(&file, fileName, (FA_READ));
-  if (FR_OK == result) {
-    char string[512];
-    if (FR_OK == f_read(&file, string, strlen(string), &bytes_read)) {
-    } else {
+FRESULT scan_files(char *path /* Start node to be scanned (***also used as work area***) */) {
+  sl_string_t s;
+  FRESULT res;
+  DIR dir;
+  UINT i;
+  static FILINFO fno;
 
-      printf("ERROR: Failed to read data from file\n");
+  res = f_opendir(&dir, path); /* Open the directory */
+  if (res == FR_OK) {
+    for (;;) {
+      res = f_readdir(&dir, &fno); /* Read a directory item */
+      if (res != FR_OK || fno.fname[0] == 0)
+        break;                    /* Break on error or end of dir */
+      if (fno.fattrib & AM_DIR) { /* It is a directory */
+        i = strlen(path);
+        sprintf(&path[i], "/%s", fno.fname);
+        res = scan_files(path); /* Enter the directory */
+        if (res != FR_OK)
+          break;
+        path[i] = 0;
+      } else { /* It is a file. */
+               // strcpy(s, fno.fname);
+        s = fno.fname;
+        if (sl_string__contains(s, ".mp3")) {
+          for (int i = 0; i < sl_string__get_length(s); i++) {
+            sendchar(s[i]);
+          }
+
+          delay__ms(1000);
+          command(0x1);
+          command(0x2);
+
+          // files[nFiles][0] = &fno.fname;
+          // files[nFiles] = fno.fname;
+          // nFiles++;
+          // printf("FileName: %s\n", files[nFiles]);
+          // printf("%s/%s\n", path, fno.fname);
+        }
+      }
     }
-    for (int i = 0; i < 512; i++) {
-      printf("%c", string[i]);
-    }
-    f_close(&file);
-  } else {
-    printf("ERROR: Failed to open: %s\n", fileName);
+    f_closedir(&dir);
   }
-}*/
+
+  return res;
+}

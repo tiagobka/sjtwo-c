@@ -21,7 +21,6 @@
 
 #ifndef FF_DEFINED
 #define FF_DEFINED	86604	/* Revision ID */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
