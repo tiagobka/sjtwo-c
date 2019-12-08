@@ -2,6 +2,7 @@
 #include "task.h"
 
 #include "GrooveLCD.h"
+#include "VS1053.h"
 #include "cli_handlers.h"
 #include "clock.h"
 #include "delay.h"
@@ -23,10 +24,8 @@
 // static QueueHandle_t values_queue;
 // TaskHandle_t xHandlePlayer;
 FRESULT scan_files(char *path);
-// char files[][];
-// char *files[100][32];
 
-sl_string_t files[100];
+char *files[100][32];
 
 uint8_t nFiles;
 
@@ -121,18 +120,19 @@ void player(void *p) {
 int main(void) {
   // sj2_cli__init();
   rgb_lcd_begin(16, 2, 0);
+
+  VS1053_begin();
+  dumpRegs();
+
   nFiles = 0;
-  // char filename[32];
 
   FATFS fs;
   FRESULT res;
   char buff[256];
-  for (;;) {
-    res = f_mount(&fs, "", 1);
-    if (res == FR_OK) {
-      strcpy(buff, "/");
-      res = scan_files(buff);
-    }
+  res = f_mount(&fs, "", 1);
+  if (res == FR_OK) {
+    strcpy(buff, "/");
+    res = scan_files(buff);
   }
 
   // for (int i = 0; i < nFiles; i++) {
@@ -186,13 +186,14 @@ FRESULT scan_files(char *path /* Start node to be scanned (***also used as work 
           break;
         path[i] = 0;
       } else { /* It is a file. */
-               // strcpy(s, fno.fname);
         s = fno.fname;
         if (sl_string__contains(s, ".mp3")) {
+          *files[nFiles] = fno.fname;
+          printf("*files[%d]: %s\n", nFiles, *files[nFiles]);
+          nFiles++;
           for (int i = 0; i < sl_string__get_length(s); i++) {
             sendchar(s[i]);
           }
-
           delay__ms(1000);
           command(0x1);
           command(0x2);

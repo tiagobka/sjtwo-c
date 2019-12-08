@@ -47,7 +47,7 @@ void rgb_lcd_begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
   // page 45 figure 23
 
   // Send function set command sequence
-  printf("Value: %x, %x\n", LCD_FUNCTIONSET, _displayfunction);
+  // printf("Value: %x, %x\n", LCD_FUNCTIONSET, _displayfunction);
   command(LCD_FUNCTIONSET | _displayfunction);
   delay__us(4500); // wait more than 4.1ms
 
@@ -81,28 +81,7 @@ void rgb_lcd_begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
   // 0010 0000 -> 0x20  (DMBLNK to 1, ie blinky mode)
   setReg(REG_MODE2, 0x20);
 
-  setRGB(0, 255, 0);
-  /*sendchar('t');
-  sendchar('i');
-  sendchar('a');
-  sendchar('g');
-  sendchar('o');
-  sendchar('1');
-  sendchar('2');
-  sendchar('3');
-  sendchar('4');
-  sendchar('5');
-  sendchar('6');
-  sendchar('7');
-  sendchar('8');
-  sendchar('9');
-  sendchar('0');
-  sendchar('1');
-  command(0xc0);
-  sendchar('2');
-  sendchar('3');
-  command(LCD_CURSORSHIFT | LCD_DISPLAYMOVE | LCD_MOVELEFT);*/
-
+  setRGB(0, 0, 0);
   // setColorWhite();
 }
 
@@ -110,7 +89,7 @@ void rgb_lcd_begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
 void command(uint8_t value) {
   static const i2c_e i2c_bus = I2C__2;
   const uint8_t temp = value;
-  printf("sending value: 0x%x\n", temp);
+  // printf("sending value: 0x%x\n", temp);
   // i2c__write_slave_data(i2c_bus, LCD_ADDRESS, 0x80, temp, 1);
   i2c__write_single(i2c_bus, LCD_ADDRESS, 0x80, temp);
 }
@@ -131,7 +110,7 @@ void i2c_send_byte(unsigned char dta) {
 void sendchar(char value) {
   static const i2c_e i2c_bus = I2C__2;
   const uint8_t temp = (uint8_t)value;
-  printf("sending char: 0x%x\n", temp);
+  // printf("sending char: 0x%x\n", temp);
   // i2c__write_slave_data(i2c_bus, LCD_ADDRESS, 0x80, temp, 1);
   i2c__write_single(i2c_bus, LCD_ADDRESS, 0x40, temp);
 }

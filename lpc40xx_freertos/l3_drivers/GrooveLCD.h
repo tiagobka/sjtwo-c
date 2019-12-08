@@ -11,8 +11,6 @@
 
 //-----------Addresses provided by Seed Groove-------
 // Device I2C Arress
-//#define LCD_ADDRESS (0x7c >> 1)
-//#define RGB_ADDRESS (0xc4 >> 1)
 #define LCD_ADDRESS (0x7c)
 #define RGB_ADDRESS (0xc4)
 
@@ -68,13 +66,13 @@
 #define LCD_5x10DOTS 0x04
 #define LCD_5x8DOTS 0x00
 //-----------END- Addresses provided by Seed Groove-------
+
 uint8_t _displayfunction;
 uint8_t _displaycontrol;
 uint8_t _displaymode;
-
 uint8_t _initialized;
-
 uint8_t _numlines, _currline;
+
 void rgb_lcd_begin(uint8_t cols, uint8_t rows, uint8_t charsize);
 void setRGB(unsigned char r, unsigned char g, unsigned char b);
 void setReg(unsigned char addr, unsigned char dta);
