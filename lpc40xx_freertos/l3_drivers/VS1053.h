@@ -6,8 +6,9 @@
 #define SJTWO_C_VS1053_H
 
 #include "delay.h"
+#include "ff.h"
 #include "gpio.h"
-#include "ssp2.h"
+//#include "ssp2.h"
 
 //-----------Addresses provided by Adafruit-------
 #define VS1053_SCI_READ 0x03
@@ -59,6 +60,7 @@ gpio_s _miso, _mosi, _clk;
 
 // VARS:
 uint8_t mp3buffer[VS1053_DATABUFFERLEN];
+volatile _Bool playingMusic;
 
 // END
 
@@ -86,4 +88,10 @@ uint16_t GPIO_digitalRead(void);
 boolean GPIO_digitalRead(uint8_t i);
 void GPIO_pinMode(uint8_t i, uint8_t dir);
 */
+
+//--------------------FILE PLAYING
+
+_Bool playFullFile(const char *trackname);
+_Bool startPlayingFile(const char *trackname);
+
 #endif // SJTWO_C_VS1053_H

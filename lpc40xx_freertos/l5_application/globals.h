@@ -9,7 +9,7 @@
 
 const int LEN_OF_NAME = 32;
 static QueueHandle_t MUSIC_NAME_QUEUE;
-const int LEN_OF_DATA = 512;
+const int LEN_OF_DATA = 32;
 static QueueHandle_t DATA_QUEUE;
 char TBFILENAME[32];
 #endif // SJTWO_C_GLOBALS_H

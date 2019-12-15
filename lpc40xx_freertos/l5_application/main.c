@@ -80,15 +80,21 @@ void reader(void *p) {
     xQueueReceive(MUSIC_NAME_QUEUE, &filename[0], portMAX_DELAY);
     // printf("reader function received: |%s|", filename);
 
-    FRESULT result = f_open(&file, filename, FA_READ);
+    // FRESULT result = f_open(&file, filename, FA_READ);
+    FRESULT result = f_open(&file, *files[0], FA_READ);
 
     if (FR_OK == result) { // opened file ok
       if (f_stat(filename, &fileInfo) == FR_OK) {
         printf("The File Size is: %d bytes\n", fileInfo.fsize);
         fileSizeBytes = fileInfo.fsize;
       }
-      char data[512] = {0};
+      char data[32] = {0};
       while (SumBytesRead < fileSizeBytes) {
+
+        while (!readyForData()) {
+          printf("waiting for data...\n");
+        }
+
         if (FR_OK == f_read(&file, data, LEN_OF_DATA, &bytes_read)) {
           SumBytesRead += bytes_read;
           // printf("bytes read: %d out of %d\n", SumBytesRead, fileSizeBytes);
@@ -101,17 +107,29 @@ void reader(void *p) {
       f_close(&file);
 
     } else { // OPEN not OK
-      printf("ERROR: Failed to open: %s\n", filename);
+             // printf("ERROR: Failed to open: |%s|\n", filename);
+      printf("ERROR: Failed to open: |%s|\n", *files[0]);
     }
   }
 }
 
 void player(void *p) {
-  char data[512] = {0};
+  char data[32] = {0};
+  sciWrite(VS1053_REG_MODE, VS1053_MODE_SM_LINE1 | VS1053_MODE_SM_SDINEW);
+  sciWrite(VS1053_REG_WRAMADDR, 0x1e29);
+  sciWrite(VS1053_REG_WRAM, 0);
+  sciWrite(VS1053_REG_DECODETIME, 0x00);
+  sciWrite(VS1053_REG_DECODETIME, 0x00);
+
   while (1) {
     xQueueReceive(DATA_QUEUE, &data[0], portMAX_DELAY);
     for (int i = 0; i < strlen(data) && i < LEN_OF_DATA; i++) {
-      putchar(data[i]);
+      gpio__reset(_dcs);
+
+      spiwrite(data[i]);
+
+      gpio__set(_dcs);
+      // putchar(data[i]);
       // printf("%c, %d", data[i], i);
     }
   }
@@ -122,18 +140,19 @@ int main(void) {
   rgb_lcd_begin(16, 2, 0);
 
   VS1053_begin();
+  setVolume(40, 40);
   dumpRegs();
 
   nFiles = 0;
-
-  FATFS fs;
-  FRESULT res;
-  char buff[256];
-  res = f_mount(&fs, "", 1);
-  if (res == FR_OK) {
-    strcpy(buff, "/");
-    res = scan_files(buff);
-  }
+  /*
+    FATFS fs;
+    FRESULT res;
+    char buff[256];
+    res = f_mount(&fs, "", 1);
+    if (res == FR_OK) {
+      strcpy(buff, "/");
+      res = scan_files(buff);
+    }*/
 
   // for (int i = 0; i < nFiles; i++) {
   // printf("FileName: %s\n", *files[i]);
@@ -160,8 +179,24 @@ int main(void) {
   MUSIC_NAME_QUEUE = xQueueCreate(1, sizeof(TBFILENAME));
   DATA_QUEUE = xQueueCreate(1, LEN_OF_DATA);
 
-  // xTaskCreate(reader, "reader", (512U * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
-  // xTaskCreate(player, "player", (512U * 4) / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
+  for (int i = 0; i < LEN_OF_NAME; i++) { // clears variable
+    TBFILENAME[i] = (char)0;
+  }
+
+  // TBFILENAME = *files[nFiles];
+  TBFILENAME[0] = 'S';
+  TBFILENAME[1] = 'e';
+  TBFILENAME[2] = 'p';
+  TBFILENAME[3] = 't';
+  TBFILENAME[4] = '.';
+  TBFILENAME[5] = 'm';
+  TBFILENAME[6] = 'p';
+  TBFILENAME[7] = '3';
+
+  xQueueSend(MUSIC_NAME_QUEUE, &TBFILENAME, 100);
+
+  // xTaskCreate(reader, "reader", 2048U, NULL, PRIORITY_MEDIUM, NULL);
+  // xTaskCreate(player, "player", 2048U, NULL, PRIORITY_HIGH, NULL);
   vTaskStartScheduler();
 }
 
