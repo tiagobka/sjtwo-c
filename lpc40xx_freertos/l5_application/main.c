@@ -66,6 +66,55 @@ app_cli_status_e cli__player_handler(app_cli__argument_t argument, sl_string_t u
 //---------------HANDLER-----------------------
 //---------------------------------------------
 
+/*void reader(void *p) {
+  FIL file; // File handle
+  char filename[32];
+  uint8_t index = 0;
+  uint64_t fileSizeBytes = 0;
+  UINT bytes_read = 0;
+  UINT SumBytesRead;
+  FILINFO fileInfo;
+
+  // while (!playingMusic);
+  while (1) {
+    printf("test1");
+    xQueueReceive(MUSIC_NAME_QUEUE, &filename[0], portMAX_DELAY);
+    printf("test2");
+
+    FRESULT result = f_open(&file, &filename[0], FA_READ);
+
+    SumBytesRead = 0;
+
+    if (FR_OK == result) {
+      if (f_stat(filename, &fileInfo) == FR_OK) {
+        fileSizeBytes = fileInfo.fsize;
+        printf("test3");
+      }
+      printf("test4");
+      char data[32] = {0};
+
+      while (SumBytesRead < fileSizeBytes) {
+
+        if (FR_OK == f_read(&file, data, 1, &bytes_read)) {
+
+          // LOGIC
+
+          if (index > 31) {
+            while (!readyForData())
+              ;
+            index = 0;
+          }
+          printf("inWhile");
+          spiwriteData(data);
+          index++;
+
+          SumBytesRead += bytes_read;
+        }
+      }
+    }
+  }
+}*/
+
 void reader(void *p) {
   FIL file; // File handle
   char filename[32];
@@ -80,8 +129,9 @@ void reader(void *p) {
     xQueueReceive(MUSIC_NAME_QUEUE, &filename[0], portMAX_DELAY);
     // printf("reader function received: |%s|", filename);
 
-    // FRESULT result = f_open(&file, filename, FA_READ);
-    FRESULT result = f_open(&file, *files[0], FA_READ);
+    FRESULT result = f_open(&file, filename, FA_READ);
+    printf("%d", result);
+    // FRESULT result = f_open(&file, &filename[0], FA_READ);
 
     if (FR_OK == result) { // opened file ok
       if (f_stat(filename, &fileInfo) == FR_OK) {
@@ -108,7 +158,7 @@ void reader(void *p) {
 
     } else { // OPEN not OK
              // printf("ERROR: Failed to open: |%s|\n", filename);
-      printf("ERROR: Failed to open: |%s|\n", *files[0]);
+      printf("ERROR: Failed to open: |%s|\n", filename);
     }
   }
 }
@@ -121,14 +171,15 @@ void player(void *p) {
   sciWrite(VS1053_REG_DECODETIME, 0x00);
   sciWrite(VS1053_REG_DECODETIME, 0x00);
 
+  dumpRegs();
+
   while (1) {
     xQueueReceive(DATA_QUEUE, &data[0], portMAX_DELAY);
     for (int i = 0; i < strlen(data) && i < LEN_OF_DATA; i++) {
       gpio__reset(_dcs);
-
       spiwrite(data[i]);
-
       gpio__set(_dcs);
+
       // putchar(data[i]);
       // printf("%c, %d", data[i], i);
     }
@@ -138,25 +189,23 @@ void player(void *p) {
 int main(void) {
   // sj2_cli__init();
   rgb_lcd_begin(16, 2, 0);
-
   VS1053_begin();
-  setVolume(40, 40);
+  // setVolume(40, 40);
   dumpRegs();
-
   nFiles = 0;
-  /*
-    FATFS fs;
-    FRESULT res;
-    char buff[256];
-    res = f_mount(&fs, "", 1);
-    if (res == FR_OK) {
-      strcpy(buff, "/");
-      res = scan_files(buff);
-    }*/
 
-  // for (int i = 0; i < nFiles; i++) {
-  // printf("FileName: %s\n", *files[i]);
-  //}
+  /*FATFS fs;
+  FRESULT res;
+  char buff[256];
+  res = f_mount(&fs, "", 1);
+  if (res == FR_OK) {
+    strcpy(buff, "/");
+    res = scan_files(buff);
+  }*/
+
+  for (int i = 0; i < nFiles; i++) {
+    printf("FileName: %s\n", *files[i]);
+  }
 
   // FRESULT fr;  /* Return value */
   // DIR dj;      /* Directory search object */
@@ -195,8 +244,8 @@ int main(void) {
 
   xQueueSend(MUSIC_NAME_QUEUE, &TBFILENAME, 100);
 
-  // xTaskCreate(reader, "reader", 2048U, NULL, PRIORITY_MEDIUM, NULL);
-  // xTaskCreate(player, "player", 2048U, NULL, PRIORITY_HIGH, NULL);
+  xTaskCreate(reader, "reader", 2048U, NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(player, "player", 2048U, NULL, PRIORITY_HIGH, NULL);
   vTaskStartScheduler();
 }
 
