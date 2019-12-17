@@ -71,6 +71,7 @@ uint16_t sciRead(uint8_t addr);             // done
 void sciWrite(uint8_t addr, uint16_t data); // done
 // void sineTest(uint8_t n, uint16_t ms);
 void spiwrite(uint8_t d); // done
+void spiwriteData(uint8_t d);
 // void spiwrite(uint8_t *c, uint16_t num); // done
 uint8_t spiread(void); // maybe done
 
@@ -93,5 +94,5 @@ void GPIO_pinMode(uint8_t i, uint8_t dir);
 
 _Bool playFullFile(const char *trackname);
 _Bool startPlayingFile(const char *trackname);
-
+_Bool SPI0TB;
 #endif // SJTWO_C_VS1053_H

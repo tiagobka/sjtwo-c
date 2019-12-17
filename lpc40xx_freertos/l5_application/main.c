@@ -116,6 +116,7 @@ app_cli_status_e cli__player_handler(app_cli__argument_t argument, sl_string_t u
 }*/
 
 void reader(void *p) {
+
   FIL file; // File handle
   char filename[32];
   uint64_t fileSizeBytes = 0;
@@ -123,6 +124,7 @@ void reader(void *p) {
   UINT SumBytesRead;
   FILINFO fileInfo;
 
+  vTaskDelay(100);
   while (1) {
     SumBytesRead = 0;
 
@@ -144,6 +146,7 @@ void reader(void *p) {
         while (!readyForData()) {
           printf("waiting for data...\n");
         }
+        // printf('0x%x 0x%x\n', sciRead(0x08), sciRead(0x09));
 
         if (FR_OK == f_read(&file, data, LEN_OF_DATA, &bytes_read)) {
           SumBytesRead += bytes_read;
@@ -171,18 +174,16 @@ void player(void *p) {
   sciWrite(VS1053_REG_DECODETIME, 0x00);
   sciWrite(VS1053_REG_DECODETIME, 0x00);
 
-  dumpRegs();
+  // dumpRegs();
 
   while (1) {
     xQueueReceive(DATA_QUEUE, &data[0], portMAX_DELAY);
-    for (int i = 0; i < strlen(data) && i < LEN_OF_DATA; i++) {
-      gpio__reset(_dcs);
+    gpio__reset(_dcs);
+    // for (int i = 0; i < strlen(data) && i < LEN_OF_DATA; i++) {
+    for (int i = 0; i < LEN_OF_DATA; i++) {
       spiwrite(data[i]);
-      gpio__set(_dcs);
-
-      // putchar(data[i]);
-      // printf("%c, %d", data[i], i);
     }
+    gpio__set(_dcs);
   }
 }
 
@@ -190,7 +191,7 @@ int main(void) {
   // sj2_cli__init();
   rgb_lcd_begin(16, 2, 0);
   VS1053_begin();
-  // setVolume(40, 40);
+  setVolume(0, 0);
   dumpRegs();
   nFiles = 0;
 
@@ -203,26 +204,8 @@ int main(void) {
     res = scan_files(buff);
   }*/
 
-  for (int i = 0; i < nFiles; i++) {
+  /*for (int i = 0; i < nFiles; i++) {
     printf("FileName: %s\n", *files[i]);
-  }
-
-  // FRESULT fr;  /* Return value */
-  // DIR dj;      /* Directory search object */
-  // FILINFO fno; /* File information */
-  // TCHAR pattern = "*.mp3";
-  /*
-    // f_findfirst(&dj, &fno, path, pattern);
-    fr = f_findfirst(&dj, &fno, "", pattern);
-    printf("%d\n", fr);
-    if (FR_OK == fr) {
-      printf("%s\n", fno.altname);
-    }*/
-
-  /*for (int i = 0; i < 4; i++) {
-    fr = f_findnext(&dj, &fno);
-    printf("return is %d", fr);
-    printf("%s- %d", fno.altname, fno.fsize);
   }*/
 
   MUSIC_NAME_QUEUE = xQueueCreate(1, sizeof(TBFILENAME));
@@ -241,6 +224,9 @@ int main(void) {
   TBFILENAME[5] = 'm';
   TBFILENAME[6] = 'p';
   TBFILENAME[7] = '3';
+  printf("Increasing SPI");
+  ssp2__init(8000);
+  printf("Increased");
 
   xQueueSend(MUSIC_NAME_QUEUE, &TBFILENAME, 100);
 
@@ -291,6 +277,7 @@ FRESULT scan_files(char *path /* Start node to be scanned (***also used as work 
       }
     }
     f_closedir(&dir);
+    printf("There are %d musics in this SD", nFiles);
   }
 
   return res;

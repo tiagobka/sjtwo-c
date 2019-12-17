@@ -3,88 +3,80 @@
 //
 #include "VS1053.h"
 #include "lpc40xx.h"
+#include "lpc_peripherals.h"
 
 void ssp2__init(uint32_t max_clock_khz) {
-  LPC_SC->PCONP |= (1 << 20);
-  // LPC_SC->PCONP |= (1<<15);
-  LPC_SSP2->CR0 = 0b111;
-  LPC_SSP2->CR1 = 0b10;
-  uint16_t div = (96000 / max_clock_khz);
-  if (div % 2) {
-    LPC_SSP2->CPSR = (96000 / max_clock_khz);
+
+  if (SPI0TB) {
+    lpc_peripheral__turn_on_power_to(LPC_PERIPHERAL__SSP0);
+    LPC_SSP0->CR0 = 0b111;
+    LPC_SSP0->CR1 = (1 << 1);
+    uint8_t divider = 2;
+    const uint32_t cpu_clock_khz = clock__get_core_clock_hz() / 1000UL;
+    while (max_clock_khz < (cpu_clock_khz / divider) && divider <= 254) {
+      divider += 2;
+    }
+    LPC_SSP0->CPSR = divider;
+
   } else {
-    div++;
-    LPC_SSP2->CPSR = (96000 / max_clock_khz);
-  }
-}
-
-void ssp0__init(uint32_t max_clock_khz) {
-  /*// Refer to LPC User manual and setup the register bits correctly
-  // a) Power on Peripheral
-  LPC_SC->PCONP = (1 << 20);
-  // b) Setup control registers CR0 and CR1
-  // CR0
-  // Select DSS
-  LPC_SSP0->CR0 = (0b0111); // 8 bit data transfer
-
-  // Select FRF
-  LPC_SSP0->CR0 &= ~(3 << 4);
-
-  // SCR
-  LPC_SSP0->CR0 &= ~(255 << 8);
-
-  // c) Setup prescalar register to be <= max_clock_mhz
-  uint32_t divider;
-  divider = 48000 / max_clock_khz;
-  LPC_SSP0->CPSR = divider;*/
-
-  LPC_SC->PCONP |= (1 << 20);
-  // LPC_SC->PCONP |= (1<<15);
-  LPC_SSP0->CR0 = 0b111;
-  LPC_SSP0->CR1 = 0b10;
-  uint16_t div = (96000 / max_clock_khz);
-  if (div % 2) {
-    LPC_SSP0->CPSR = (96000 / max_clock_khz);
-  } else {
-    div++;
-    LPC_SSP0->CPSR = (96000 / max_clock_khz);
+    LPC_SC->PCONP |= (1 << 20);
+    // LPC_SC->PCONP |= (1<<15);
+    LPC_SSP2->CR0 = 0b111;
+    LPC_SSP2->CR1 = 0b10;
+    uint16_t div = (96000 / max_clock_khz);
+    if (div % 2) {
+      LPC_SSP2->CPSR = (96000 / max_clock_khz);
+    } else {
+      div++;
+      LPC_SSP2->CPSR = (96000 / max_clock_khz);
+    }
   }
 }
 
 void todo_configure_your_ssp2_pin_functions(void) {
+
+  if (SPI0TB) {
+    _miso = gpio__construct_with_function(GPIO__PORT_0, 17, GPIO__FUNCTION_2);
+    _mosi = gpio__construct_with_function(GPIO__PORT_0, 18, GPIO__FUNCTION_2);
+    _clk = gpio__construct_with_function(GPIO__PORT_0, 15, GPIO__FUNCTION_2);
+  } else {
+    _miso = gpio__construct_with_function(GPIO__PORT_1, 4, GPIO__FUNCTION_4);
+    _mosi = gpio__construct_with_function(GPIO__PORT_1, 1, GPIO__FUNCTION_4);
+    _clk = gpio__construct_with_function(GPIO__PORT_1, 0, GPIO__FUNCTION_4);
+  }
+
   _cs = gpio__construct_as_output(GPIO__PORT_0, 16);
-  _miso = gpio__construct_with_function(GPIO__PORT_1, 4, GPIO__FUNCTION_4);
-  //_miso = gpio__construct_with_function(GPIO__PORT_0, 17, GPIO__FUNCTION_2);
   gpio__set_as_input(_miso);
-  _clk = gpio__construct_with_function(GPIO__PORT_1, 0, GPIO__FUNCTION_4);
-  //_clk = gpio__construct_with_function(GPIO__PORT_0, 15, GPIO__FUNCTION_2);
   gpio__set_as_output(_clk);
-  _mosi = gpio__construct_with_function(GPIO__PORT_1, 1, GPIO__FUNCTION_4);
-  //_mosi = gpio__construct_with_function(GPIO__PORT_0, 18, GPIO__FUNCTION_2);
   gpio__set_as_output(_mosi);
 }
 
 uint8_t ssp2__exchange_byte_tiago(uint8_t data_out) {
-  LPC_SSP2->DR = data_out;
-  while (LPC_SSP2->SR & (1 << 4))
-    ;
-  return (uint8_t)(LPC_SSP2->DR & 0xFF);
+
+  if (SPI0TB) {
+    LPC_SSP0->DR = data_out;
+    while (LPC_SSP0->SR & (1 << 4))
+      ;
+    return (uint8_t)(LPC_SSP0->DR & 0xFF);
+  } else {
+    LPC_SSP2->DR = data_out;
+    while (LPC_SSP2->SR & (1 << 4))
+      ;
+    return (uint8_t)(LPC_SSP2->DR & 0xFF);
+  }
 }
 
 uint8_t ssp0__exchange(uint8_t data_out) {
-  const uint8_t BSY = (1 << 4);
-  // Configure the Data register(DR) to send and receive data by checking the status register
-  // writing operation
   LPC_SSP0->DR = data_out;
-  // reading operation
-  while ((LPC_SSP0->SR & BSY))
+  while (LPC_SSP0->SR & (1 << 4))
     ;
-  return data_out = LPC_SSP0->DR;
+  return (uint8_t)(LPC_SSP0->DR & 0xFF);
 }
 
 uint8_t VS1053_begin(void) {
 
-  printf("Hello1");
+  SPI0TB = true;
+
   // hardcoded pins for now
   /*_cs = gpio__construct_as_output(GPIO__PORT_0, 16);
   _miso = gpio__construct_with_function(GPIO__PORT_1, 4, GPIO__FUNCTION_4);
@@ -92,20 +84,16 @@ uint8_t VS1053_begin(void) {
   _mosi = gpio__construct_with_function(GPIO__PORT_1, 1, GPIO__FUNCTION_4);
   gpio__set_as_output(_mosi);
   _clk = gpio__construct_with_function(GPIO__PORT_1, 0, GPIO__FUNCTION_4);*/
-  printf("Hello2");
-  ssp2__init(125);
-  printf("Hello3");
-  // ssp0__init(125);
+
+  ssp2__init(250);
+
   todo_configure_your_ssp2_pin_functions();
-  printf("Hello4");
 
   _dcs = gpio__construct_as_output(GPIO__PORT_2, 9);
   _dreq = gpio__construct_as_input(GPIO__PORT_2, 7);
   _reset = gpio__construct_as_output(GPIO__PORT_2, 5);
 
-  printf("Hello5");
   gpio__reset(_reset);
-  printf("Hello6");
   gpio__set(_cs);
   gpio__set(_dcs);
 
@@ -129,16 +117,19 @@ void reset(void) {
   delay__ms(100);
   softReset();
   delay__ms(100);
-  sciWrite(VS1053_REG_CLOCKF, 0x6000);
+  sciWrite(VS1053_REG_CLOCKF, 0x6000); // 8BE8
+  // sciWrite(VS1053_REG_CLOCKF, 0x21F4);
   setVolume(40, 40);
 }
+
 void softReset(void) {
   sciWrite(VS1053_REG_MODE, VS1053_MODE_SM_SDINEW | VS1053_MODE_SM_RESET);
   delay__ms(100);
 }
 
 void sciWrite(uint8_t addr, uint16_t data) {
-
+  while (!readyForData())
+    ;
   gpio__reset(_cs);
 
   /*ssp2__exchange_byte_tiago(VS1053_SCI_WRITE);
@@ -157,7 +148,7 @@ void sciWrite(uint8_t addr, uint16_t data) {
 void spiwrite(uint8_t c) {
   // uint8_t x __attribute__((aligned(32))) = c;
   // spiwrite(&x, 1);
-  printf("Printing 0x%x\n", c);
+  // printf("Printing 0x%x\n", c);
   ssp2__exchange_byte_tiago(c);
   // ssp0__exchange(c);
 }
@@ -215,6 +206,13 @@ void dumpRegs(void) {
 
   temp = sciRead(VS1053_REG_CLOCKF);
   printf("REG_CLOCKF: 0x%x\n", temp);
+}
+
+void spiwriteData(uint8_t d) {
+  // gpio__reset(_dcs);
+  ssp2__exchange_byte_tiago(d);
+  // ssp0__exchange(d);
+  // gpio__set(_dcs);
 }
 
 //------------------------ PLAY FILE
