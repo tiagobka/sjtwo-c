@@ -25,9 +25,12 @@
 // TaskHandle_t xHandlePlayer;
 FRESULT scan_files(char *path);
 
-char *files[100][32];
-
-uint8_t nFiles;
+char files[100][32];
+/*char *menu[100] = {
+        "Play",
+        "Pause",
+};;*/
+// char *globs[100];
 
 gpio_s CS, SO, SCK, SI;
 //-------------------------------------------
@@ -144,7 +147,7 @@ void reader(void *p) {
       while (SumBytesRead < fileSizeBytes) {
 
         while (!readyForData()) {
-          printf("waiting for data...\n");
+          // printf("waiting for data...\n");
         }
         // printf('0x%x 0x%x\n', sciRead(0x08), sciRead(0x09));
 
@@ -194,40 +197,24 @@ int main(void) {
   setVolume(0, 0);
   dumpRegs();
   nFiles = 0;
+  track = 0;
 
-  /*FATFS fs;
+  FATFS fs;
   FRESULT res;
   char buff[256];
   res = f_mount(&fs, "", 1);
   if (res == FR_OK) {
     strcpy(buff, "/");
     res = scan_files(buff);
-  }*/
+  }
 
-  /*for (int i = 0; i < nFiles; i++) {
-    printf("FileName: %s\n", *files[i]);
-  }*/
+  updateFile(track);
 
   MUSIC_NAME_QUEUE = xQueueCreate(1, sizeof(TBFILENAME));
   DATA_QUEUE = xQueueCreate(1, LEN_OF_DATA);
 
-  for (int i = 0; i < LEN_OF_NAME; i++) { // clears variable
-    TBFILENAME[i] = (char)0;
-  }
-
-  // TBFILENAME = *files[nFiles];
-  TBFILENAME[0] = 'S';
-  TBFILENAME[1] = 'e';
-  TBFILENAME[2] = 'p';
-  TBFILENAME[3] = 't';
-  TBFILENAME[4] = '.';
-  TBFILENAME[5] = 'm';
-  TBFILENAME[6] = 'p';
-  TBFILENAME[7] = '3';
-  printf("Increasing SPI");
-  ssp2__init(8000);
-  printf("Increased");
-
+  // ssp2__init(8000);
+  setSPISpeed(8000);
   xQueueSend(MUSIC_NAME_QUEUE, &TBFILENAME, 100);
 
   xTaskCreate(reader, "reader", 2048U, NULL, PRIORITY_MEDIUM, NULL);
@@ -241,7 +228,6 @@ FRESULT scan_files(char *path /* Start node to be scanned (***also used as work 
   DIR dir;
   UINT i;
   static FILINFO fno;
-
   res = f_opendir(&dir, path); /* Open the directory */
   if (res == FR_OK) {
     for (;;) {
@@ -251,34 +237,36 @@ FRESULT scan_files(char *path /* Start node to be scanned (***also used as work 
       if (fno.fattrib & AM_DIR) { /* It is a directory */
         i = strlen(path);
         sprintf(&path[i], "/%s", fno.fname);
+
         res = scan_files(path); /* Enter the directory */
         if (res != FR_OK)
           break;
         path[i] = 0;
       } else { /* It is a file. */
+
+        char temp[32];
         s = fno.fname;
         if (sl_string__contains(s, ".mp3")) {
-          *files[nFiles] = fno.fname;
-          printf("*files[%d]: %s\n", nFiles, *files[nFiles]);
-          nFiles++;
-          for (int i = 0; i < sl_string__get_length(s); i++) {
-            sendchar(s[i]);
+          for (int i = 0; i < 32; i++) {
+            files[nFiles][i] = fno.fname[i];
           }
-          delay__ms(1000);
-          command(0x1);
-          command(0x2);
+          printf("*files[%d]: %s\n", nFiles, files[nFiles]);
 
-          // files[nFiles][0] = &fno.fname;
-          // files[nFiles] = fno.fname;
-          // nFiles++;
-          // printf("FileName: %s\n", files[nFiles]);
-          // printf("%s/%s\n", path, fno.fname);
+          nFiles++;
         }
       }
     }
     f_closedir(&dir);
-    printf("There are %d musics in this SD", nFiles);
+    printf("There are %d musics in this SD\n", nFiles);
   }
-
   return res;
+}
+
+void updateFile(uint16_t track) {
+  for (int i = 0; i < LEN_OF_NAME; i++) { // clears variable
+    TBFILENAME[i] = (char)0;
+  }
+  for (int i = 0; i < LEN_OF_NAME; i++) { // update name
+    TBFILENAME[i] = files[track][i];
+  }
 }

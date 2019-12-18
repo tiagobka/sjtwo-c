@@ -11,18 +11,25 @@ void ssp2__init(uint32_t max_clock_khz) {
     lpc_peripheral__turn_on_power_to(LPC_PERIPHERAL__SSP0);
     LPC_SSP0->CR0 = 0b111;
     LPC_SSP0->CR1 = (1 << 1);
-    uint8_t divider = 2;
-    const uint32_t cpu_clock_khz = clock__get_core_clock_hz() / 1000UL;
-    while (max_clock_khz < (cpu_clock_khz / divider) && divider <= 254) {
-      divider += 2;
-    }
-    LPC_SSP0->CPSR = divider;
 
   } else {
     LPC_SC->PCONP |= (1 << 20);
     // LPC_SC->PCONP |= (1<<15);
     LPC_SSP2->CR0 = 0b111;
     LPC_SSP2->CR1 = 0b10;
+  }
+  setSPISpeed(max_clock_khz);
+}
+
+void setSPISpeed(uint32_t max_clock_khz) {
+  if (SPI0TB) {
+    uint8_t divider = 2;
+    const uint32_t cpu_clock_khz = clock__get_core_clock_hz() / 1000UL;
+    while (max_clock_khz < (cpu_clock_khz / divider) && divider <= 254) {
+      divider += 2;
+    }
+    LPC_SSP0->CPSR = divider;
+  } else {
     uint16_t div = (96000 / max_clock_khz);
     if (div % 2) {
       LPC_SSP2->CPSR = (96000 / max_clock_khz);
@@ -76,16 +83,9 @@ uint8_t ssp0__exchange(uint8_t data_out) {
 uint8_t VS1053_begin(void) {
 
   SPI0TB = true;
-
-  // hardcoded pins for now
-  /*_cs = gpio__construct_as_output(GPIO__PORT_0, 16);
-  _miso = gpio__construct_with_function(GPIO__PORT_1, 4, GPIO__FUNCTION_4);
-  gpio__set_as_input(_miso);
-  _mosi = gpio__construct_with_function(GPIO__PORT_1, 1, GPIO__FUNCTION_4);
-  gpio__set_as_output(_mosi);
-  _clk = gpio__construct_with_function(GPIO__PORT_1, 0, GPIO__FUNCTION_4);*/
-
   ssp2__init(250);
+
+  playingMusic = false;
 
   todo_configure_your_ssp2_pin_functions();
 

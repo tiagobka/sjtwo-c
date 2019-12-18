@@ -61,6 +61,9 @@ gpio_s _miso, _mosi, _clk;
 // VARS:
 uint8_t mp3buffer[VS1053_DATABUFFERLEN];
 volatile _Bool playingMusic;
+_Bool SPI0TB;   // true for SPI0
+uint16_t track; // Track Number
+uint8_t nFiles; // number of Files in the SD card
 
 // END
 
@@ -94,5 +97,5 @@ void GPIO_pinMode(uint8_t i, uint8_t dir);
 
 _Bool playFullFile(const char *trackname);
 _Bool startPlayingFile(const char *trackname);
-_Bool SPI0TB;
+
 #endif // SJTWO_C_VS1053_H
